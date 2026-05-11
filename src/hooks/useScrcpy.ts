@@ -22,6 +22,7 @@ export interface ScrcpyConfig {
     stayAwake?: boolean;
     turnOff?: boolean;
     audioEnabled?: boolean;
+    audioCodec?: string;
     alwaysOnTop?: boolean;
     fullscreen?: boolean;
     borderless?: boolean;
@@ -83,6 +84,7 @@ export function useScrcpy() {
         stayAwake: false,
         turnOff: false,
         audioEnabled: true,
+        audioCodec: "auto",
         alwaysOnTop: false,
         res: "0",
         recordPath: "",
