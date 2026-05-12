@@ -3,6 +3,8 @@ use std::process::{Command as StdCommand, Stdio};
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use serde_json::json;
 use crate::ScrcpyState;
 use tokio::process::Command as TokioCommand;
@@ -11,6 +13,24 @@ use tokio::time::{timeout, Duration};
 use serde::Deserialize;
 use flate2::read::GzDecoder;
 use tar::Archive;
+
+const AUDIO_FALLBACK_CHAIN: &[&str] = &["aac", "flac", "raw"];
+
+fn is_audio_codec_error(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    if lower.contains("could not create default audio encoder")
+        || lower.contains("failed to initialize audio")
+    {
+        return true;
+    }
+    let mentions_codec = lower.contains("audio encoder") || lower.contains("audio codec");
+    let mentions_failure = lower.contains("fail")
+        || lower.contains("error")
+        || lower.contains("could not")
+        || lower.contains("not available")
+        || lower.contains("not supported");
+    mentions_codec && mentions_failure
+}
 
 #[tauri::command]
 pub fn greet(name: &str) -> String {
@@ -579,7 +599,7 @@ pub async fn get_render_drivers(custom_path: Option<String>) -> serde_json::Valu
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ScrcpyConfig {
     device: String,
@@ -590,6 +610,7 @@ pub struct ScrcpyConfig {
     stay_awake: Option<bool>,
     turn_off: Option<bool>,
     audio_enabled: Option<bool>,
+    audio_codec: Option<String>,
     always_on_top: Option<bool>,
     fullscreen: Option<bool>,
     borderless: Option<bool>,
@@ -612,7 +633,24 @@ pub struct ScrcpyConfig {
     render_driver: Option<String>,
 }
 
-fn build_scrcpy_args(config: &ScrcpyConfig, video_dir_fallback: Option<String>) -> Vec<String> {
+fn resolve_audio_codec_flag<'a>(config: &'a ScrcpyConfig, audio_codec_override: Option<&'a str>) -> Option<&'a str> {
+    if let Some(c) = audio_codec_override {
+        let trimmed = c.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed);
+        }
+    }
+    config.audio_codec.as_deref().and_then(|c| {
+        let trimmed = c.trim();
+        if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
+            None
+        } else {
+            Some(trimmed)
+        }
+    })
+}
+
+fn build_scrcpy_args(config: &ScrcpyConfig, video_dir_fallback: Option<String>, audio_codec_override: Option<&str>) -> Vec<String> {
     let mut args = Vec::new();
     
     // Construct arguments based on config
@@ -658,7 +696,13 @@ fn build_scrcpy_args(config: &ScrcpyConfig, video_dir_fallback: Option<String>) 
             args.push(format!("{}M", bitrate));
         }
         
-        if let Some(audio) = config.audio_enabled { if !audio { args.push("--no-audio".to_string()); } }
+        let audio_enabled = config.audio_enabled.unwrap_or(true);
+        if !audio_enabled { args.push("--no-audio".to_string()); }
+        if audio_enabled {
+            if let Some(codec) = resolve_audio_codec_flag(config, audio_codec_override) {
+                args.push(format!("--audio-codec={}", codec));
+            }
+        }
         if let Some(aot) = config.always_on_top { if aot { args.push("--always-on-top".to_string()); } }
         if let Some(fs) = config.fullscreen { if fs { args.push("--fullscreen".to_string()); } }
         if let Some(bl) = config.borderless { if bl { args.push("--window-borderless".to_string()); } }
@@ -734,52 +778,21 @@ fn build_scrcpy_args(config: &ScrcpyConfig, video_dir_fallback: Option<String>) 
     args
 }
 
-#[tauri::command]
-pub async fn run_scrcpy(window: Window, state: State<'_, ScrcpyState>, config: ScrcpyConfig, app_handle: tauri::AppHandle) -> Result<(), String> {
-    
-    let video_dir = app_handle.path().video_dir().ok().map(|p| p.to_string_lossy().to_string());
-    let args = build_scrcpy_args(&config, video_dir);
-
-    let exe_path = get_binary_path("scrcpy", config.scrcpy_path.clone());
-    
-    // Log the session details for the user
-    let mode_label = match config.session_mode.as_str() {
-        "camera" => "Camera Mode",
-        "desktop" => "Desktop Mode",
-        _ => "Screen Mirroring",
-    };
-    
-    let res_label = config.res.as_ref().map(|r| if r == "0" { "Original" } else { r }).unwrap_or("Original");
-    let bitrate_label = format!("{}Mbps", config.bitrate.unwrap_or(8));
-    let fps_label = format!("{}fps", config.fps.unwrap_or(60));
-    
-    let _ = window.emit("scrcpy-log", format!("[SYSTEM] Starting {} session...", mode_label));
-    let _ = window.emit("scrcpy-log", format!("[SYSTEM] Target: {} | Config: {} @ {}, {}", config.device, res_label, bitrate_label, fps_label));
-    
-    if config.record.unwrap_or(false) {
-        let path = config.record_path.as_ref().map(|p| if p.is_empty() { "Videos" } else { p }).unwrap_or("Videos");
-        let _ = window.emit("scrcpy-log", format!("[SYSTEM] Recording enabled -> output to {}", path));
-    }
-
-    let adb_exe_path = get_binary_path("adb", config.scrcpy_path.clone());
-    let server_path = if !exe_path.is_empty() && exe_path != "scrcpy" {
-        let p = Path::new(&exe_path).parent().map(|p| p.join("scrcpy-server").to_string_lossy().to_string());
-        p
-    } else {
-        None
-    };
-
-    let _ = window.emit("scrcpy-log", format!("[SYSTEM] Using scrcpy: {}", exe_path));
-    let _ = window.emit("scrcpy-log", format!("[SYSTEM] Using adb: {}", adb_exe_path));
-
+async fn spawn_scrcpy_streams(
+    window: &Window,
+    exe_path: &str,
+    adb_exe_path: &str,
+    server_path: Option<&str>,
+    args: &[String],
+) -> Result<(tokio::process::Child, Arc<AtomicBool>), String> {
     let command_str = format!("> scrcpy {}", args.join(" "));
     let _ = window.emit("scrcpy-log", command_str);
 
-    let mut command = create_command(&exe_path);
-    command.args(&args);
-    command.env("ADB", &adb_exe_path);
+    let mut command = create_command(exe_path);
+    command.args(args);
+    command.env("ADB", adb_exe_path);
     if let Some(sp) = server_path {
-        if Path::new(&sp).exists() {
+        if Path::new(sp).exists() {
             command.env("SCRCPY_SERVER_PATH", sp);
         }
     }
@@ -787,11 +800,13 @@ pub async fn run_scrcpy(window: Window, state: State<'_, ScrcpyState>, config: S
     command.stderr(Stdio::piped());
 
     let mut child = command.spawn().map_err(|e| e.to_string())?;
-    
+
     let stdout = child.stdout.take().expect("Failed to capture stdout");
     let stderr = child.stderr.take().expect("Failed to capture stderr");
-    
-    let window_clone = window.clone();
+
+    let audio_error_flag = Arc::new(AtomicBool::new(false));
+
+    let window_stdout = window.clone();
     tokio::spawn(async move {
         let reader = BufReader::new(stdout);
         let mut lines = reader.lines();
@@ -810,19 +825,19 @@ pub async fn run_scrcpy(window: Window, state: State<'_, ScrcpyState>, config: S
                 _ = interval.tick() => {
                     if !buffer.is_empty() {
                         let combined = buffer.join("\n");
-                        let _ = window_clone.emit("scrcpy-log", combined);
+                        let _ = window_stdout.emit("scrcpy-log", combined);
                         buffer.clear();
                     }
                 }
             }
         }
-        // Final flush
         if !buffer.is_empty() {
-            let _ = window_clone.emit("scrcpy-log", buffer.join("\n"));
+            let _ = window_stdout.emit("scrcpy-log", buffer.join("\n"));
         }
     });
 
-    let window_clone2 = window.clone();
+    let window_stderr = window.clone();
+    let flag_clone = audio_error_flag.clone();
     tokio::spawn(async move {
         let reader = BufReader::new(stderr);
         let mut lines = reader.lines();
@@ -833,7 +848,12 @@ pub async fn run_scrcpy(window: Window, state: State<'_, ScrcpyState>, config: S
             tokio::select! {
                 line_res = lines.next_line() => {
                     match line_res {
-                        Ok(Some(line)) => buffer.push(line),
+                        Ok(Some(line)) => {
+                            if is_audio_codec_error(&line) {
+                                flag_clone.store(true, Ordering::SeqCst);
+                            }
+                            buffer.push(line);
+                        }
                         Ok(None) => break,
                         Err(_) => break,
                     }
@@ -841,57 +861,184 @@ pub async fn run_scrcpy(window: Window, state: State<'_, ScrcpyState>, config: S
                 _ = interval.tick() => {
                     if !buffer.is_empty() {
                         let combined = buffer.join("\n");
-                        let _ = window_clone2.emit("scrcpy-log", combined);
+                        let _ = window_stderr.emit("scrcpy-log", combined);
                         buffer.clear();
                     }
                 }
             }
         }
-        // Final flush
         if !buffer.is_empty() {
-            let _ = window_clone2.emit("scrcpy-log", buffer.join("\n"));
+            let _ = window_stderr.emit("scrcpy-log", buffer.join("\n"));
         }
     });
 
-    // Store process
+    Ok((child, audio_error_flag))
+}
+
+enum AttemptOutcome {
+    Exited(String),
+    WaitError(String),
+    UserStopped,
+}
+
+#[tauri::command]
+pub async fn run_scrcpy(window: Window, state: State<'_, ScrcpyState>, config: ScrcpyConfig, app_handle: tauri::AppHandle) -> Result<(), String> {
+
+    let video_dir = app_handle.path().video_dir().ok().map(|p| p.to_string_lossy().to_string());
+
+    let exe_path = get_binary_path("scrcpy", config.scrcpy_path.clone());
+
+    // Log the session details for the user
+    let mode_label = match config.session_mode.as_str() {
+        "camera" => "Camera Mode",
+        "desktop" => "Desktop Mode",
+        _ => "Screen Mirroring",
+    };
+
+    let res_label = config.res.as_ref().map(|r| if r == "0" { "Original" } else { r }).unwrap_or("Original");
+    let bitrate_label = format!("{}Mbps", config.bitrate.unwrap_or(8));
+    let fps_label = format!("{}fps", config.fps.unwrap_or(60));
+
+    let _ = window.emit("scrcpy-log", format!("[SYSTEM] Starting {} session...", mode_label));
+    let _ = window.emit("scrcpy-log", format!("[SYSTEM] Target: {} | Config: {} @ {}, {}", config.device, res_label, bitrate_label, fps_label));
+
+    if config.record.unwrap_or(false) {
+        let path = config.record_path.as_ref().map(|p| if p.is_empty() { "Videos" } else { p }).unwrap_or("Videos");
+        let _ = window.emit("scrcpy-log", format!("[SYSTEM] Recording enabled -> output to {}", path));
+    }
+
+    let adb_exe_path = get_binary_path("adb", config.scrcpy_path.clone());
+    let server_path = if !exe_path.is_empty() && exe_path != "scrcpy" {
+        Path::new(&exe_path).parent().map(|p| p.join("scrcpy-server").to_string_lossy().to_string())
+    } else {
+        None
+    };
+
+    let _ = window.emit("scrcpy-log", format!("[SYSTEM] Using scrcpy: {}", exe_path));
+    let _ = window.emit("scrcpy-log", format!("[SYSTEM] Using adb: {}", adb_exe_path));
+
+    // Decide whether automatic audio codec fallback should kick in on errors.
+    let audio_enabled = config.audio_enabled.unwrap_or(true);
+    let audio_codec_mode = config.audio_codec.as_deref().unwrap_or("auto").trim();
+    let should_auto_fallback = audio_enabled
+        && (audio_codec_mode.is_empty() || audio_codec_mode.eq_ignore_ascii_case("auto"));
+
+    // First attempt: honour the user's audio codec choice. In "auto" mode this
+    // launches without --audio-codec, matching the previous default behaviour.
+    let initial_args = build_scrcpy_args(&config, video_dir.clone(), None);
+
+    let (child, audio_error_flag) = spawn_scrcpy_streams(
+        &window,
+        &exe_path,
+        &adb_exe_path,
+        server_path.as_deref(),
+        &initial_args,
+    ).await?;
+
     state.processes.lock().unwrap().insert(config.device.clone(), child);
     let _ = window.emit("scrcpy-status", json!({ "device": config.device, "running": true }));
 
-    // Monitor for exit
+    // Monitor for exit (and orchestrate the audio codec fallback chain)
     let device_mon = config.device.clone();
     let window_mon = window.clone();
-    let app_handle = window.app_handle().clone();
+    let app_handle_mon = window.app_handle().clone();
+    let video_dir_mon = video_dir;
+    let exe_path_mon = exe_path;
+    let adb_exe_path_mon = adb_exe_path;
+    let server_path_mon = server_path;
+    let config_mon = config.clone();
 
     tokio::spawn(async move {
+        let mut current_audio_flag = audio_error_flag;
+        let mut chain_index: usize = 0;
+
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            
-            let state_mon = app_handle.state::<ScrcpyState>();
-            let mut processes = state_mon.processes.lock().unwrap();
-            if let Some(child) = processes.get_mut(&device_mon) {
-                // Explicitly use tokio's try_wait to help inference
-                match child.try_wait() {
-                    Ok(Some(status)) => {
-                        let _ = window_mon.emit("scrcpy-log", format!("[SYSTEM] Scrcpy process exited with status: {}", status));
+            tokio::time::sleep(Duration::from_millis(500)).await;
+
+            let outcome = {
+                let state_mon = app_handle_mon.state::<ScrcpyState>();
+                let mut processes = state_mon.processes.lock().unwrap();
+                match processes.get_mut(&device_mon) {
+                    Some(child) => match child.try_wait() {
+                        Ok(Some(status)) => {
+                            processes.remove(&device_mon);
+                            Some(AttemptOutcome::Exited(status.to_string()))
+                        }
+                        Ok(None) => None,
+                        Err(e) => {
+                            processes.remove(&device_mon);
+                            Some(AttemptOutcome::WaitError(e.to_string()))
+                        }
+                    },
+                    None => Some(AttemptOutcome::UserStopped),
+                }
+            };
+
+            let outcome = match outcome {
+                Some(o) => o,
+                None => continue,
+            };
+
+            match outcome {
+                AttemptOutcome::WaitError(e) => {
+                    let _ = window_mon.emit("scrcpy-log", format!("[SYSTEM] Error waiting for scrcpy: {}", e));
+                    let _ = window_mon.emit("scrcpy-status", json!({ "device": device_mon, "running": false }));
+                    break;
+                }
+                AttemptOutcome::UserStopped => {
+                    let _ = window_mon.emit("scrcpy-status", json!({ "device": device_mon, "running": false }));
+                    break;
+                }
+                AttemptOutcome::Exited(status) => {
+                    let _ = window_mon.emit("scrcpy-log", format!("[SYSTEM] Scrcpy process exited with status: {}", status));
+
+                    // Give stream reader tasks a moment to flush remaining stderr
+                    // lines (the audio error pattern may still be in flight).
+                    tokio::time::sleep(Duration::from_millis(250)).await;
+
+                    let audio_failed = current_audio_flag.load(Ordering::SeqCst);
+
+                    if should_auto_fallback && audio_failed && chain_index < AUDIO_FALLBACK_CHAIN.len() {
+                        let next_codec = AUDIO_FALLBACK_CHAIN[chain_index];
+                        let _ = window_mon.emit(
+                            "scrcpy-log",
+                            format!("[SYSTEM] Default audio codec failed, retrying with {}...", next_codec.to_uppercase()),
+                        );
+
+                        let new_args = build_scrcpy_args(&config_mon, video_dir_mon.clone(), Some(next_codec));
+
+                        match spawn_scrcpy_streams(
+                            &window_mon,
+                            &exe_path_mon,
+                            &adb_exe_path_mon,
+                            server_path_mon.as_deref(),
+                            &new_args,
+                        ).await {
+                            Ok((new_child, new_flag)) => {
+                                let state_mon = app_handle_mon.state::<ScrcpyState>();
+                                state_mon.processes.lock().unwrap().insert(device_mon.clone(), new_child);
+                                current_audio_flag = new_flag;
+                                chain_index += 1;
+                                continue;
+                            }
+                            Err(e) => {
+                                let _ = window_mon.emit("scrcpy-log", format!("[SYSTEM] Failed to spawn retry: {}", e));
+                                let _ = window_mon.emit("scrcpy-status", json!({ "device": device_mon, "running": false }));
+                                break;
+                            }
+                        }
+                    } else if should_auto_fallback && audio_failed {
+                        let _ = window_mon.emit(
+                            "scrcpy-log",
+                            "[SYSTEM] No compatible audio codec found. Consider disabling audio forwarding.".to_string(),
+                        );
                         let _ = window_mon.emit("scrcpy-status", json!({ "device": device_mon, "running": false }));
-                        processes.remove(&device_mon);
                         break;
-                    }
-                    Ok(None) => {
-                        // Still running
-                    }
-                    Err(e) => {
-                        let _ = window_mon.emit("scrcpy-log", format!("[SYSTEM] Error waiting for scrcpy: {}", e));
+                    } else {
                         let _ = window_mon.emit("scrcpy-status", json!({ "device": device_mon, "running": false }));
-                        processes.remove(&device_mon);
                         break;
                     }
                 }
-            } else {
-                // Process removed manually (stop_scrcpy) or was never added (rare error)
-                // We emit just in case to sync UI
-                let _ = window_mon.emit("scrcpy-status", json!({ "device": device_mon, "running": false }));
-                break;
             }
         }
     });
@@ -903,23 +1050,22 @@ pub async fn run_scrcpy(window: Window, state: State<'_, ScrcpyState>, config: S
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_build_scrcpy_args_mirror_defaults() {
-        let config = ScrcpyConfig {
+    fn base_config(session_mode: &str) -> ScrcpyConfig {
+        ScrcpyConfig {
             device: "device1".to_string(),
-            session_mode: "mirror".to_string(),
+            session_mode: session_mode.to_string(),
             bitrate: None,
             fps: None,
             stay_awake: None,
             turn_off: None,
             audio_enabled: None,
+            audio_codec: None,
             always_on_top: None,
             fullscreen: None,
             borderless: None,
             record: None,
             record_path: None,
             scrcpy_path: None,
-            otg_enabled: None,
             otg_pure: None,
             camera_facing: None,
             camera_id: None,
@@ -931,9 +1077,16 @@ mod tests {
             vd_dpi: None,
             rotation: None,
             res: None,
-        };
+            hid_keyboard: None,
+            hid_mouse: None,
+            render_driver: None,
+        }
+    }
 
-        let args = build_scrcpy_args(&config, None);
+    #[test]
+    fn test_build_scrcpy_args_mirror_defaults() {
+        let config = base_config("mirror");
+        let args = build_scrcpy_args(&config, None, None);
         assert!(args.contains(&"-s".to_string()));
         assert!(args.contains(&"device1".to_string()));
         assert!(args.contains(&"--video-codec=h264".to_string()));
@@ -941,35 +1094,11 @@ mod tests {
 
     #[test]
     fn test_build_scrcpy_args_camera_mode() {
-        let config = ScrcpyConfig {
-            device: "device1".to_string(),
-            session_mode: "camera".to_string(),
-            bitrate: None,
-            fps: Some(30),
-            stay_awake: None,
-            turn_off: None,
-            audio_enabled: None,
-            always_on_top: None,
-            fullscreen: None,
-            borderless: None,
-            record: None,
-            record_path: None,
-            scrcpy_path: None,
-            otg_enabled: None,
-            otg_pure: None,
-            camera_facing: Some("front".to_string()),
-            camera_id: None,
-            codec: None,
-            camera_ar: None,
-            camera_high_speed: None,
-            vd_width: None,
-            vd_height: None,
-            vd_dpi: None,
-            rotation: None,
-            res: None,
-        };
+        let mut config = base_config("camera");
+        config.fps = Some(30);
+        config.camera_facing = Some("front".to_string());
 
-        let args = build_scrcpy_args(&config, None);
+        let args = build_scrcpy_args(&config, None, None);
         assert!(args.contains(&"--video-source=camera".to_string()));
         assert!(args.contains(&"--camera-facing=front".to_string()));
         assert!(args.contains(&"--camera-fps".to_string()));
@@ -978,39 +1107,72 @@ mod tests {
 
     #[test]
     fn test_build_scrcpy_args_bitrate_and_fps() {
-        let config = ScrcpyConfig {
-            device: "device1".to_string(),
-            session_mode: "mirror".to_string(),
-            bitrate: Some(8),
-            fps: Some(60),
-            stay_awake: None,
-            turn_off: None,
-            audio_enabled: None,
-            always_on_top: None,
-            fullscreen: None,
-            borderless: None,
-            record: None,
-            record_path: None,
-            scrcpy_path: None,
-            otg_enabled: None,
-            otg_pure: None,
-            camera_facing: None,
-            camera_id: None,
-            codec: None,
-            camera_ar: None,
-            camera_high_speed: None,
-            vd_width: None,
-            vd_height: None,
-            vd_dpi: None,
-            rotation: None,
-            res: None,
-        };
+        let mut config = base_config("mirror");
+        config.bitrate = Some(8);
+        config.fps = Some(60);
 
-        let args = build_scrcpy_args(&config, None);
+        let args = build_scrcpy_args(&config, None, None);
         assert!(args.contains(&"--video-bit-rate".to_string()));
         assert!(args.contains(&"8M".to_string()));
         assert!(args.contains(&"--max-fps".to_string()));
         assert!(args.contains(&"60".to_string()));
+    }
+
+    #[test]
+    fn test_audio_codec_auto_adds_no_flag() {
+        let mut config = base_config("mirror");
+        config.audio_codec = Some("auto".to_string());
+
+        let args = build_scrcpy_args(&config, None, None);
+        assert!(!args.iter().any(|a| a.starts_with("--audio-codec")));
+    }
+
+    #[test]
+    fn test_audio_codec_manual_adds_flag() {
+        let mut config = base_config("mirror");
+        config.audio_codec = Some("aac".to_string());
+
+        let args = build_scrcpy_args(&config, None, None);
+        assert!(args.contains(&"--audio-codec=aac".to_string()));
+    }
+
+    #[test]
+    fn test_audio_codec_override_takes_precedence() {
+        let mut config = base_config("mirror");
+        config.audio_codec = Some("auto".to_string());
+
+        let args = build_scrcpy_args(&config, None, Some("flac"));
+        assert!(args.contains(&"--audio-codec=flac".to_string()));
+    }
+
+    #[test]
+    fn test_audio_codec_skipped_when_audio_disabled() {
+        let mut config = base_config("mirror");
+        config.audio_enabled = Some(false);
+        config.audio_codec = Some("aac".to_string());
+
+        let args = build_scrcpy_args(&config, None, None);
+        assert!(args.contains(&"--no-audio".to_string()));
+        assert!(!args.iter().any(|a| a.starts_with("--audio-codec")));
+    }
+
+    #[test]
+    fn test_is_audio_codec_error_matches_known_patterns() {
+        assert!(is_audio_codec_error(
+            "ERROR: Could not create default audio encoder for opus"
+        ));
+        assert!(is_audio_codec_error("Failed to initialize audio/opus"));
+        assert!(is_audio_codec_error("audio codec not supported on device"));
+        assert!(is_audio_codec_error("audio encoder failed to start"));
+    }
+
+    #[test]
+    fn test_is_audio_codec_error_ignores_unrelated() {
+        assert!(!is_audio_codec_error("ADB disconnected"));
+        assert!(!is_audio_codec_error("device offline"));
+        assert!(!is_audio_codec_error("video encoder error"));
+        assert!(!is_audio_codec_error("permission issue"));
+        assert!(!is_audio_codec_error("INFO Audio codec selected: opus"));
     }
 }
 

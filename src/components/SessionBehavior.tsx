@@ -1,8 +1,12 @@
+import { useEffect, useRef, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { ScrcpyConfig } from '../hooks/useScrcpy';
 import Tooltip from './Tooltip';
-import { Coffee, MonitorOff, Volume2, Layers, Maximize, Square, Circle, Folder, Settings2 } from 'lucide-react';
+import { Coffee, MonitorOff, Volume2, Layers, Maximize, Square, Circle, Folder, Settings2, ChevronDown } from 'lucide-react';
 import { useI18n } from '../i18n';
+
+const AUDIO_CODEC_VALUES = ['auto', 'opus', 'aac', 'flac', 'raw'] as const;
+type AudioCodec = typeof AUDIO_CODEC_VALUES[number];
 
 interface SessionBehaviorProps {
     config: ScrcpyConfig;
@@ -33,6 +37,67 @@ export default function SessionBehavior({ config, setConfig }: SessionBehaviorPr
         } catch (e) {
             console.error(e);
         }
+    };
+
+    const AudioCodecPicker = ({ value, onChange, disabled }: { value: AudioCodec, onChange: (v: AudioCodec) => void, disabled: boolean }) => {
+        const [isOpen, setIsOpen] = useState(false);
+        const ref = useRef<HTMLDivElement>(null);
+
+        useEffect(() => {
+            const onDoc = (e: MouseEvent) => {
+                if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+            };
+            if (isOpen) document.addEventListener('mousedown', onDoc);
+            return () => document.removeEventListener('mousedown', onDoc);
+        }, [isOpen]);
+
+        useEffect(() => {
+            if (disabled) setIsOpen(false);
+        }, [disabled]);
+
+        const labelFor = (v: AudioCodec) =>
+            v === 'auto' ? t('sessionBehavior.audioCodecAuto') :
+                v === 'opus' ? t('sessionBehavior.audioCodecOpus') :
+                    v === 'aac' ? t('sessionBehavior.audioCodecAac') :
+                        v === 'flac' ? t('sessionBehavior.audioCodecFlac') :
+                            t('sessionBehavior.audioCodecRaw');
+
+        return (
+            <div
+                ref={ref}
+                onClick={(e) => e.stopPropagation()}
+                className={`mt-0.5 pl-7 pr-2 pb-1 transition-opacity ${disabled ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}
+            >
+                <div className="flex items-center gap-1.5">
+                    <span className="text-[8px] font-black uppercase text-zinc-500 tracking-widest">{t('sessionBehavior.audioCodec')}</span>
+                    <Tooltip text={t('sessionBehavior.audioCodecTooltip')} />
+                    <div className="relative ml-auto">
+                        <button
+                            type="button"
+                            onClick={() => !disabled && setIsOpen(o => !o)}
+                            disabled={disabled}
+                            className="flex items-center gap-1 bg-zinc-950/60 border border-zinc-800 hover:border-primary/60 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-300 hover:text-primary transition-colors"
+                        >
+                            <span>{labelFor(value)}</span>
+                            <ChevronDown size={10} className={`transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        {isOpen && (
+                            <div className="absolute right-0 top-full mt-1 z-50 min-w-[88px] bg-zinc-950 border border-zinc-800 rounded-md shadow-2xl py-1 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100">
+                                {AUDIO_CODEC_VALUES.map((opt) => (
+                                    <div
+                                        key={opt}
+                                        onClick={() => { onChange(opt); setIsOpen(false); }}
+                                        className={`px-2 py-1 text-[9px] uppercase tracking-wider font-bold cursor-pointer transition-colors ${value === opt ? 'bg-primary/20 text-primary' : 'text-zinc-400 hover:bg-primary hover:text-on-primary'}`}
+                                    >
+                                        {labelFor(opt)}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     const Toggle = ({ checked, onChange, icon: Icon, label, tooltip, danger = false }: { checked: boolean, onChange: (v: boolean) => void, icon: any, label: string, tooltip: string, danger?: boolean }) => (
@@ -82,13 +147,22 @@ export default function SessionBehavior({ config, setConfig }: SessionBehaviorPr
                         label={t('sessionBehavior.screenOff')}
                         tooltip={t('sessionBehavior.screenOffTooltip')}
                     />
-                    <Toggle
-                        checked={config.audioEnabled || false}
-                        onChange={(v) => handleChange('audioEnabled', v)}
-                        icon={Volume2}
-                        label={t('sessionBehavior.forwardAudio')}
-                        tooltip={t('sessionBehavior.forwardAudioTooltip')}
-                    />
+                    <div>
+                        <Toggle
+                            checked={config.audioEnabled || false}
+                            onChange={(v) => handleChange('audioEnabled', v)}
+                            icon={Volume2}
+                            label={t('sessionBehavior.forwardAudio')}
+                            tooltip={t('sessionBehavior.forwardAudioTooltip')}
+                        />
+                        {config.audioEnabled && (
+                            <AudioCodecPicker
+                                value={(AUDIO_CODEC_VALUES.includes((config.audioCodec as AudioCodec)) ? config.audioCodec : 'auto') as AudioCodec}
+                                onChange={(v) => handleChange('audioCodec', v)}
+                                disabled={!config.audioEnabled}
+                            />
+                        )}
+                    </div>
                     <Toggle
                         checked={config.alwaysOnTop || false}
                         onChange={(v) => handleChange('alwaysOnTop', v)}
