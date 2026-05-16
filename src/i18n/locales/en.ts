@@ -2,12 +2,10 @@
 // Every other locale should mirror these keys.
 
 export const en = {
-    languages: {
-        en: 'English',
+    languages: { en: 'English',
         fr: 'Français',
         'pt-BR': 'Português (Brasil)',
-        'zh-TW': 'Traditional Chinese'
-    },
+        'zh-TW': 'Traditional Chinese', ru: 'Русский' },
     common: {
         ok: 'OK',
         cancel: 'Cancel',
@@ -284,3 +282,4 @@ export const en = {
 };
 
 export type Translations = typeof en;
+

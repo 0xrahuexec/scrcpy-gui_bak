@@ -1,12 +1,10 @@
 import type { Translations } from './en';
 
 export const fr: Translations = {
-    languages: {
-        en: 'Anglais',
+    languages: { en: 'Anglais',
         fr: 'Français',
         'pt-BR': 'Portugais (Brésil)',
-        'zh-TW': 'Chinois traditionnel'
-    },
+        'zh-TW': 'Chinois traditionnel', ru: 'Русский' },
     common: {
         ok: 'OK',
         cancel: 'Annuler',
@@ -281,3 +279,4 @@ export const fr: Translations = {
         commandFailed: '[ERROR] La commande a échoué : {error}'
     }
 };
+

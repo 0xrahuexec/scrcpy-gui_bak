@@ -2,18 +2,13 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { en, type Translations } from './locales/en';
 import { fr } from './locales/fr';
 import { ptBR } from './locales/pt-BR';
-import { zhTW } from './locales/zh-TW';
+import { zhTW } from './locales/zh-TW'; import { ru } from './locales/ru';
 
 
-export type Locale = 'en' | 'fr' | 'pt-BR' | 'zh-TW';
-export const SUPPORTED_LOCALES: Locale[] = ['en', 'fr', 'pt-BR', 'zh-TW'];
+export type Locale = 'en' | 'fr' | 'pt-BR' | 'zh-TW' | 'ru';
+export const SUPPORTED_LOCALES: Locale[] = ['en', 'fr', 'pt-BR', 'zh-TW', 'ru'];
 const STORAGE_KEY = 'scrcpy_locale';
-const localeBundles: Record<Locale, Translations> = {
-    en,
-    fr,
-    'pt-BR': ptBR,
-    'zh-TW': zhTW
-};
+const localeBundles: Record<Locale, Translations> = { en, fr, 'pt-BR': ptBR, 'zh-TW': zhTW, ru };
 
 type Primitive = string | number | boolean;
 
@@ -62,7 +57,7 @@ function detectInitialLocale(): Locale {
         if (lower === 'zh-tw' || lower.startsWith('zh-tw')) return 'zh-TW';
         if (lower.startsWith('zh')) return 'zh-TW';
         if (lower === 'pt-br' || lower.startsWith('pt-br')) return 'pt-BR';
-        if (lower.startsWith('pt')) return 'pt-BR';
+        if (lower.startsWith('pt')) return 'pt-BR'; if (lower.startsWith('ru')) return 'ru';
         if (lower.startsWith('fr')) return 'fr';
         if (lower.startsWith('en')) return 'en';
     }
@@ -174,3 +169,4 @@ export function useTranslation() {
     const { t, locale, setLocale, translations } = useI18n();
     return { t, locale, setLocale, translations };
 }
+

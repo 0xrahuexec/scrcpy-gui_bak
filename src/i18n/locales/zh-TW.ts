@@ -1,12 +1,10 @@
 import type { Translations } from './en';
 
 export const zhTW: Translations = {
-    languages: {
-        en: 'English',
+    languages: { en: 'English',
         fr: 'Français',
         'pt-BR': 'Português (Brasil)',
-        'zh-TW': '繁體中文'
-    },
+        'zh-TW': '繁體中文', ru: 'Русский' },
     common: {
         ok: '確定',
         cancel: '取消',
@@ -281,3 +279,4 @@ export const zhTW: Translations = {
         commandFailed: '[錯誤] 指令失敗：{error}'
     }
 };
+

@@ -1,12 +1,10 @@
 import type { Translations } from './en';
 
 export const ptBR: Translations = {
-    languages: {
-        en: 'Inglês',
+    languages: { en: 'Inglês',
         fr: 'Francês',
         'pt-BR': 'Português (Brasil)',
-        'zh-TW': 'Chinês Tradicional'
-    },
+        'zh-TW': 'Chinês Tradicional', ru: 'Русский' },
     common: {
         ok: 'OK',
         cancel: 'Cancelar',
@@ -281,3 +279,4 @@ export const ptBR: Translations = {
         commandFailed: '[ERROR] Comando falhou: {error}'
     }
 };
+
