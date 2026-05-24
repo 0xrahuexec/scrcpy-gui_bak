@@ -88,7 +88,9 @@ pub fn run() {
             commands::get_render_drivers,
             commands::get_videos_dir,
             commands::save_report,
+            commands::get_scrcpy_bin_dir,
             commands::run_terminal_command,
+            commands::check_scrcpy_update,
             close_splashscreen,
             get_app_version
         ])

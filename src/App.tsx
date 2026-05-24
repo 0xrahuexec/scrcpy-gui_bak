@@ -63,6 +63,11 @@ function App() {
     title: string;
     message: string;
     kind: 'warning' | 'error' | 'info' | 'success';
+    actionLabel?: string;
+    onAction?: () => void;
+    showCancel?: boolean;
+    cancelLabel?: string;
+    onCancel?: () => void;
   }>({
     isOpen: false,
     title: '',
@@ -71,9 +76,30 @@ function App() {
   });
 
   const [appVersion, setAppVersion] = useState("3.3.0");
+  const [lastCheckedPath, setLastCheckedPath] = useState<string | undefined>(undefined);
+  const [hasCheckedUpdate, setHasCheckedUpdate] = useState(false);
 
-  const showAlert = (title: string, message: string, kind: 'warning' | 'error' | 'info' | 'success' = 'info') => {
-    setAlertState({ isOpen: true, title, message, kind });
+  const showAlert = (
+    title: string,
+    message: string,
+    kind: 'warning' | 'error' | 'info' | 'success' = 'info',
+    actionLabel = 'OK',
+    onAction?: () => void,
+    showCancel = false,
+    cancelLabel = 'Cancel',
+    onCancel?: () => void
+  ) => {
+    setAlertState({
+      isOpen: true,
+      title,
+      message,
+      kind,
+      actionLabel,
+      onAction,
+      showCancel,
+      cancelLabel,
+      onCancel
+    });
   };
 
   useEffect(() => {
@@ -99,6 +125,44 @@ function App() {
     checkScrcpy(config.scrcpyPath);
     refreshDevices(config.scrcpyPath, true);
   }, []);
+
+  useEffect(() => {
+    if (scrcpyStatus.found && (!hasCheckedUpdate || config.scrcpyPath !== lastCheckedPath) && !isDownloading) {
+      setHasCheckedUpdate(true);
+      setLastCheckedPath(config.scrcpyPath);
+      
+      const runCheck = async () => {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          const updateRes: any = await invoke('check_scrcpy_update', { customPath: config.scrcpyPath });
+          if (updateRes && updateRes.update_available) {
+            showAlert(
+              t('alerts.updateAvailableTitle'),
+              t('alerts.updateAvailableMessage', {
+                local: updateRes.local_version || 'unknown',
+                latest: updateRes.latest_version || 'unknown'
+              }),
+              'info',
+              t('alerts.updateBtn'),
+              async () => {
+                if (config.scrcpyPath) {
+                  setConfig(prev => ({ ...prev, scrcpyPath: undefined }));
+                }
+                await downloadScrcpy();
+              },
+              true,
+              t('alerts.cancelBtn')
+            );
+          }
+        } catch (e) {
+          console.error("Failed to check for scrcpy updates:", e);
+        }
+      };
+      runCheck();
+    } else if (!scrcpyStatus.found) {
+      setHasCheckedUpdate(false);
+    }
+  }, [scrcpyStatus.found, config.scrcpyPath, isDownloading, hasCheckedUpdate, lastCheckedPath, t]);
 
   useEffect(() => {
     // Global Drag and Drop Listener (re-bind only if activeDevice changes)
@@ -194,10 +258,15 @@ function App() {
 
   const handleSetPath = async () => {
     try {
+      let startPath = config.scrcpyPath;
+      if (!startPath) {
+        const { invoke } = await import('@tauri-apps/api/core');
+        startPath = await invoke<string>('get_scrcpy_bin_dir').catch(() => '');
+      }
       const selected = await open({
         directory: true,
         multiple: false,
-        defaultPath: config.scrcpyPath || undefined
+        defaultPath: startPath || undefined
       });
       if (selected && typeof selected === 'string') {
         setConfig(prev => ({ ...prev, scrcpyPath: selected }));
@@ -320,6 +389,11 @@ function App() {
           title={alertState.title}
           message={alertState.message}
           kind={alertState.kind}
+          actionLabel={alertState.actionLabel}
+          onAction={alertState.onAction}
+          showCancel={alertState.showCancel}
+          cancelLabel={alertState.cancelLabel}
+          onCancel={alertState.onCancel}
         />
       </div>
     </ErrorBoundary>

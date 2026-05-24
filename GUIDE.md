@@ -1,4 +1,4 @@
-# 📖 ScrcpyGUI v3 - User Guide
+# 📖 ScrcpyGUI v4 - User Guide
 
 This guide provides everything you need to know to get started with ScrcpyGUI, from initial setup to advanced feature usage.
 
@@ -18,7 +18,7 @@ This guide provides everything you need to know to get started with ScrcpyGUI, f
 
 Before using ScrcpyGUI, ensure you have the following:
 
-- **Android Device**: Running Android 5.0 or higher.
+- **Android Device**: Running Android 5.0 or higher (Android 12+ required for Camera Mode, Android 11+ for Desktop Mode).
 - **USB Cable**: A high-quality data cable (avoid charging-only cables).
 - **PC**: Windows, macOS, or Linux.
 - **Scrcpy Binaries**: The app can download these for you automatically, but you can also provide your own.
@@ -31,6 +31,7 @@ Before using ScrcpyGUI, ensure you have the following:
 1. Download the latest `.exe` or `.msi` from the [Releases](https://github.com/kil0bit-kb/scrcpy-gui/releases) page.
 2. Run the installer or standalone executable.
 3. **Smart Setup**: On the first launch, ScrcpyGUI will detect if you have `scrcpy` installed. If not, it will offer a one-click download.
+4. **Automated Updates**: When launched, ScrcpyGUI v4 will automatically check your installed version against Genymobile's latest official release and prompt you with a beautiful one-click update modal if a new version is available.
 
 ### 🍎 macOS
 1. Download the `.dmg` file matching your architecture (**Intel** or **Apple Silicon/M1/M2**).
@@ -89,17 +90,29 @@ You must enable **Developer Options** and **USB Debugging** on your phone for Sc
 ## 🎮 Feature Guide
 
 ### ⌨️ HID Keyboard & Mouse (OTG Mode)
-ScrcpyGUI v3 features advanced hardware simulation (HID) for a lag-free experience.
+ScrcpyGUI v4 features advanced hardware simulation (HID) for a lag-free experience.
 - **HID Keyboard**: Simulates a real USB keyboard. This is the **only way** to fix issues with Polish accents, special characters, and international layouts.
 - **HID Mouse**: Provides a high-precision, native cursor feel. Eliminates the "double cursor" or lag found in standard mirroring.
 - **Pure HID (No Mirror)**: Perfect for when you only want to use your PC as a "controller" for your phone (e.g., typing long messages or playing games while looking at the phone screen).
 
 ### 📹 Pro Camera Mode (Webcam)
-Turn your phone into a professional webcam.
+Turn your phone into a professional, hardware-controlled webcam.
 1. Change **Capture Source** to **Camera**.
-2. Select your lens (Back, Front, or even the Ultra-Wide lens).
-3. Set your desired **FPS** (up to 60fps supported on most modern phones).
-4. **OBS Integration**: Open **OBS Studio**, add a "Window Capture" source, and select the ScrcpyGUI window. Use OBS's **Virtual Camera** to use your phone in Zoom, Teams, or Discord.
+2. **Scan Lenses**: Click the **Refresh Lenses** button. ScrcpyGUI will instantly scan your phone and populate a spacious dropdown with all physical camera lenses, native resolutions, and zoom capabilities.
+3. **Select Camera**: Select your desired lens (e.g., Ultra-Wide, Front, or Main Back) from the list.
+4. **Advanced Controls**:
+   - **Camera Torch**: Toggle your device's physical flashlight on or off directly from the GUI.
+   - **Camera Zoom**: Adjust the dynamic zoom level slider (1.0x to 5.0x) to frame your feed perfectly.
+   - **Failsafe Resolution**: Standard high-megapixel phone lenses can crash scrcpy if launched at their native 4:3 photo resolution (e.g., `4080x3060`) due to hardware video encoder limits. ScrcpyGUI automatically maps your selected resolution and defaults to a safe 1080p standard size (`1920x1080`), ensuring a crash-free experience.
+   - **FPS**: Set to **Auto** (recommended) to let your device run at its native capture frame rate, or select **30 FPS**.
+5. **OBS Integration**: Open **OBS Studio**, add a "Window Capture" source, and select the ScrcpyGUI window. Use OBS's **Virtual Camera** to use your phone in Zoom, Teams, or Discord.
+
+### 🖥️ Desktop Mode (Virtual Display)
+Turn your Android device into a secondary workspace or virtual monitor.
+1. Change **Capture Source** to **Desktop**.
+2. **Flex Display**: Toggle ON **Flex Display**. Dragging and resizing the scrcpy client window borders on your computer will dynamically scale the resolution and aspect ratio of your phone's virtual display on the fly to fit your window perfectly with no black bars.
+3. **Background Color**: Customize the window borders or letterbox border colors by typing in a hex value (e.g., `#2b2d42`) with a live preview swatch.
+4. **Keep Active**: Enable **Keep Active** to simulate activity and prevent the virtual display from turning off or sleeping during mirroring sessions.
 
 ### 🖥 Graphics Renderer (Render API)
 You can choose which graphics renderer scrcpy should request for video display.
@@ -111,15 +124,7 @@ Renderer choices are **capability-aware**:
 
 - ScrcpyGUI reads what your installed scrcpy build advertises.
 - ScrcpyGUI filters options by your host OS.
-- Unsupported options are hidden automatically.
-
-Examples:
-
-- Windows typically shows Direct3D/OpenGL/OpenGL ES/Software (no Metal).
-- macOS may show Metal/OpenGL/OpenGL ES/Software.
-- Linux typically shows OpenGL/OpenGL ES/Software.
-
-If a renderer is selected manually, ScrcpyGUI passes it to scrcpy with `--render-driver`.
+- Unsupported options are hidden automatically (e.g. Metal is only shown on macOS).
 
 ### 📂 File Transfers & APKs
 - **Install Apps**: Just drag an `.apk` file from your PC and drop it anywhere into the ScrcpyGUI window.

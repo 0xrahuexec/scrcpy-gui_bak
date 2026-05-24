@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { ScrcpyConfig } from '../hooks/useScrcpy';
 import Tooltip from './Tooltip';
-import { Coffee, MonitorOff, Volume2, Layers, Maximize, Square, Circle, Folder, Settings2, ChevronDown } from 'lucide-react';
+import { Coffee, MonitorOff, Volume2, Layers, Maximize, Square, Circle, Folder, Settings2, ChevronDown, ActivitySquare } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 const AUDIO_CODEC_VALUES = ['auto', 'opus', 'aac', 'flac', 'raw'] as const;
@@ -139,6 +139,14 @@ export default function SessionBehavior({ config, setConfig }: SessionBehaviorPr
                         icon={Coffee}
                         label={t('sessionBehavior.stayAwake')}
                         tooltip={t('sessionBehavior.stayAwakeTooltip')}
+                    />
+                    {/* v4: Keep Active */}
+                    <Toggle
+                        checked={config.keepActive || false}
+                        onChange={(v) => handleChange('keepActive', v)}
+                        icon={ActivitySquare}
+                        label={t('sessionBehavior.keepActive')}
+                        tooltip={t('sessionBehavior.keepActiveTooltip')}
                     />
                     <Toggle
                         checked={config.turnOff || false}

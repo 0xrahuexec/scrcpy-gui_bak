@@ -154,7 +154,18 @@ export const zhTW: Translations = {
         startMission: '開始',
         engageCamera: '啟用相機',
         ejectToDesktop: '輸出至桌面',
-        stopSession: '停止'
+        stopSession: '停止',
+        // v4 features
+        flexDisplay: '彈性顯示',
+        flexDisplayTooltip: '隨 scrcpy 視窗動態調整虛擬顯示器大小（scrcpy v4+）。',
+        cameraTorch: '手電筒',
+        cameraTorchTooltip: '擒射攏預時開啟裝置手電筒（scrcpy v4+）。',
+        cameraZoom: '錢頭縮放',
+        cameraZoomTooltip: '擒射時的縮放級別。1.0 = 不縮放。（scrcpy v4+）',
+        backgroundColor: '背景顏色',
+        backgroundColorTooltip: '視窗背景/外邊區域的十六進位顏色（如 #1a1a1a）。留白則使用預設深灰色。（scrcpy v4+）',
+        backgroundColorNone: '預設',
+        badgeNew: '新'
     },
     sessionBehavior: {
         title: '行為設定',
@@ -182,7 +193,10 @@ export const zhTW: Translations = {
         recordPath: '錄影路徑',
         change: '變更',
         defaultVideosFolder: '預設（影片資料夾）',
-        selectRecordingFolderTitle: '選擇錄影資料夾'
+        selectRecordingFolderTitle: '選擇錄影資料夾',
+        // v4 features
+        keepActive: '保持活躍',
+        keepActiveTooltip: '模擬使用者操作以防止螢幕進入閒置狀態（scrcpy v4+）。'
     },
     shortcuts: {
         title: '快捷鍵 (Alt +)',
@@ -247,7 +261,11 @@ export const zhTW: Translations = {
     },
     alerts: {
         noDeviceSelectedTitle: '未選擇裝置',
-        noDeviceSelectedMessage: "請從側邊欄選擇一個裝置以繼續。提示：如果您剛連接手機，請點擊側邊欄的「重新整理」以更新清單。"
+        noDeviceSelectedMessage: "請從側邊栏選擇一個裝置以繼續。提示：如果您剛連接手機，請點擊側邊栏的「重新整理」以更新清單。",
+        updateAvailableTitle: '有可用更新',
+        updateAvailableMessage: 'Scrcpy 新版本 (v{latest}) 已發布。您目前安裝的版本是 v{local}。是否現在更新？',
+        updateBtn: '立即更新',
+        cancelBtn: '以後再說'
     },
     logs: {
         noDeviceForDragDrop: '[警告] 未選擇裝置，無法進行拖放操作。',

@@ -44,6 +44,12 @@ export interface ScrcpyConfig {
     hidKeyboard?: boolean;
     hidMouse?: boolean;
     renderDriver?: string;
+    // v4 features
+    flexDisplay?: boolean;
+    cameraTorch?: boolean;
+    cameraZoom?: number;
+    backgroundColor?: string;
+    keepActive?: boolean;
 }
 
 export function useScrcpy() {
@@ -80,7 +86,7 @@ export function useScrcpy() {
         device: "",
         sessionMode: "mirror",
         bitrate: 8,
-        fps: 60,
+        fps: undefined,
         stayAwake: false,
         turnOff: false,
         audioEnabled: true,
@@ -93,7 +99,13 @@ export function useScrcpy() {
         vdDpi: 420,
         aspectRatioLock: true,
         hidKeyboard: false,
-        hidMouse: false
+        hidMouse: false,
+        // v4 features
+        flexDisplay: false,
+        cameraTorch: false,
+        cameraZoom: 1.0,
+        backgroundColor: '',
+        keepActive: false
     });
     const prevDevicesRef = useRef<string[]>([]);
 

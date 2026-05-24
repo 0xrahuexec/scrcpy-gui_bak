@@ -31,8 +31,15 @@ function deepMerge<T>(base: T, override: unknown): T {
     }
     const result: Record<string, unknown> = { ...base };
     for (const key of Object.keys(override)) {
-        const baseVal = (base as Record<string, unknown>)[key];
-        const overrideVal = (override as Record<string, unknown>)[key];
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+            continue;
+        }
+        const baseVal = Object.prototype.hasOwnProperty.call(base, key)
+            ? (base as Record<string, unknown>)[key]
+            : undefined;
+        const overrideVal = Object.prototype.hasOwnProperty.call(override, key)
+            ? (override as Record<string, unknown>)[key]
+            : undefined;
         if (isPlainObject(baseVal) && isPlainObject(overrideVal)) {
             result[key] = deepMerge(baseVal, overrideVal);
         } else if (overrideVal === undefined || overrideVal === null || overrideVal === '') {
@@ -86,7 +93,10 @@ function resolveByPath(source: unknown, path: string): unknown {
     const segments = path.split('.');
     let current: unknown = source;
     for (const segment of segments) {
-        if (isPlainObject(current) && segment in current) {
+        if (segment === '__proto__' || segment === 'constructor' || segment === 'prototype') {
+            return undefined;
+        }
+        if (isPlainObject(current) && Object.prototype.hasOwnProperty.call(current, segment)) {
             current = (current as Record<string, unknown>)[segment];
         } else {
             return undefined;
@@ -98,8 +108,14 @@ function resolveByPath(source: unknown, path: string): unknown {
 function formatTemplate(template: string, vars?: Record<string, Primitive>): string {
     if (!vars) return template;
     return template.replace(/\{(\w+)\}/g, (match, key) => {
-        const value = vars[key];
-        return value === undefined || value === null ? match : String(value);
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+            return match;
+        }
+        if (Object.prototype.hasOwnProperty.call(vars, key)) {
+            const value = vars[key];
+            return value === undefined || value === null ? match : String(value);
+        }
+        return match;
     });
 }
 
@@ -132,7 +148,8 @@ export function I18nProvider({ children, initialLocale }: I18nProviderProps) {
     }, [locale]);
 
     const translations = useMemo<Translations>(() => {
-        const overrides = localeBundles[locale] ?? en;
+        const safeLocale = SUPPORTED_LOCALES.includes(locale) ? locale : 'en';
+        const overrides = localeBundles[safeLocale] ?? en;
         // Deep-merge into the English base so that any missing key in another
         // locale falls back to the English string automatically.
         return deepMerge(en, overrides);

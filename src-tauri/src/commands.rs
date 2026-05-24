@@ -78,14 +78,51 @@ fn get_binary_path(binary_name: &str, custom_folder: Option<String>) -> String {
 }
 
 fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
-    std::fs::create_dir_all(&dst)?;
-    for entry in std::fs::read_dir(src)? {
+    let src_ref = src.as_ref();
+    let dst_ref = dst.as_ref();
+    
+    // Canonicalize dst path if it exists to get absolute base path
+    let canonical_dst = if dst_ref.exists() {
+        dst_ref.canonicalize()?
+    } else {
+        std::fs::create_dir_all(dst_ref)?;
+        dst_ref.canonicalize()?
+    };
+    
+    for entry in std::fs::read_dir(src_ref)? {
         let entry = entry?;
+        let entry_path = entry.path();
+        let file_name = entry.file_name();
+        
+        // Prevent directory traversal elements in entry name
+        let file_name_str = file_name.to_string_lossy();
+        if file_name_str.contains("..") || file_name_str.contains('/') || file_name_str.contains('\\') {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Directory entry contains directory traversal components",
+            ));
+        }
+        
+        let target_path = dst_ref.join(&file_name);
+        
+        // Ensure destination path is strictly within the target base directory
+        if let Some(parent_dir) = target_path.parent() {
+            if parent_dir.exists() {
+                let canonical_parent = parent_dir.canonicalize()?;
+                if !canonical_parent.starts_with(&canonical_dst) && canonical_parent != canonical_dst {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::PermissionDenied,
+                        "Path traversal attempt detected during directory copy",
+                    ));
+                }
+            }
+        }
+        
         let ty = entry.file_type()?;
         if ty.is_dir() {
-            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+            copy_dir_all(&entry_path, &target_path)?;
         } else {
-            std::fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+            std::fs::copy(&entry_path, &target_path)?;
         }
     }
     Ok(())
@@ -631,6 +668,12 @@ pub struct ScrcpyConfig {
     hid_keyboard: Option<bool>,
     hid_mouse: Option<bool>,
     render_driver: Option<String>,
+    // v4 features
+    flex_display: Option<bool>,
+    camera_torch: Option<bool>,
+    camera_zoom: Option<f32>,
+    background_color: Option<String>,
+    keep_active: Option<bool>,
 }
 
 fn resolve_audio_codec_flag<'a>(config: &'a ScrcpyConfig, audio_codec_override: Option<&'a str>) -> Option<&'a str> {
@@ -717,6 +760,7 @@ fn build_scrcpy_args(config: &ScrcpyConfig, video_dir_fallback: Option<String>, 
         let can_control = config.session_mode != "camera";
         if can_control {
              if let Some(sa) = config.stay_awake { if sa { args.push("--stay-awake".to_string()); } }
+             if let Some(ka) = config.keep_active { if ka { args.push("--keep-active".to_string()); } }
              if let Some(to) = config.turn_off { if to { args.push("--turn-screen-off".to_string()); args.push("--no-power-on".to_string()); } }
         }
 
@@ -727,9 +771,37 @@ fn build_scrcpy_args(config: &ScrcpyConfig, video_dir_fallback: Option<String>, 
                 else if let Some(facing) = &config.camera_facing { args.push(format!("--camera-facing={}", facing)); }
             } else if let Some(facing) = &config.camera_facing { args.push(format!("--camera-facing={}", facing)); }
             
-             // Resolution logic simplified for brevity (can expand)
+            // Resolution logic: Map res (e.g., "1920") to standard camera sizes (e.g., "1920x1080")
+            if let Some(res) = &config.res {
+                if res != "0" {
+                    let camera_size = match res.as_str() {
+                        "3840" => "3840x2160",
+                        "2560" => "2560x1440",
+                        "1920" => "1920x1080",
+                        "1600" => "1600x900",
+                        "1280" => "1280x720",
+                        "1024" => "1024x576",
+                        "800" => "800x480",
+                        _ => "1920x1080",
+                    };
+                    args.push(format!("--camera-size={}", camera_size));
+                } else {
+                    // Safe fallback default to avoid camera configuration error on non-standard sensor photo sizes (e.g. 4080x3060)
+                    args.push("--camera-size=1920x1080".to_string());
+                }
+            } else {
+                args.push("--camera-size=1920x1080".to_string());
+            }
+
             if let Some(ar) = &config.camera_ar { if ar != "0" { args.push(format!("--camera-ar={}", ar)); } }
             if let Some(chs) = config.camera_high_speed { if chs { args.push("--camera-high-speed".to_string()); } }
+            // v4: camera torch and zoom
+            if let Some(true) = config.camera_torch { args.push("--camera-torch".to_string()); }
+            if let Some(zoom) = config.camera_zoom {
+                if zoom > 1.005 { // avoid floating point noise at 1.0
+                    args.push(format!("--camera-zoom={:.1}", zoom));
+                }
+            }
              // fps handled generically below
         } else if config.session_mode == "desktop" {
              let w = config.vd_width.unwrap_or(1920);
@@ -737,26 +809,32 @@ fn build_scrcpy_args(config: &ScrcpyConfig, video_dir_fallback: Option<String>, 
              let dpi = config.vd_dpi.unwrap_or(420);
              args.push(format!("--new-display={}x{}/{}", w, h, dpi));
              args.push("--video-buffer=100".to_string());
+             // v4: flex display (resize virtual display with window)
+             if let Some(true) = config.flex_display { args.push("--flex-display".to_string()); }
         }
         
         if let Some(fps) = config.fps {
-            if config.session_mode == "camera" {
-                args.push("--camera-fps".to_string());
-            } else {
-                args.push("--max-fps".to_string());
+            if fps > 0 {
+                if config.session_mode == "camera" {
+                    args.push("--camera-fps".to_string());
+                } else {
+                    args.push("--max-fps".to_string());
+                }
+                args.push(fps.to_string());
             }
-            args.push(fps.to_string());
         } else if config.session_mode == "camera" && config.camera_high_speed.unwrap_or(false) {
             args.push("--camera-fps".to_string());
             args.push("60".to_string());
         }
 
-        // Shared resolution logic (applies to mirror and camera in scrcpy 3.x)
-        if let Some(res) = &config.res { 
-            if res != "0" { 
-                args.push("--max-size".to_string()); 
-                args.push(res.clone()); 
-            } 
+        // Shared resolution logic (applies to mirror and desktop)
+        if config.session_mode != "camera" {
+            if let Some(res) = &config.res { 
+                if res != "0" { 
+                    args.push("--max-size".to_string()); 
+                    args.push(res.clone()); 
+                } 
+            }
         }
         
         if let Some(rec) = config.record {
@@ -772,6 +850,14 @@ fn build_scrcpy_args(config: &ScrcpyConfig, video_dir_fallback: Option<String>, 
                  let full_path = std::path::Path::new(&path).join(filename);
                  args.push(format!("--record={}", full_path.to_string_lossy()));
              }
+        }
+
+        // v4: background color (all modes)
+        if let Some(ref color) = config.background_color {
+            let trimmed = color.trim();
+            if !trimmed.is_empty() {
+                args.push(format!("--background-color={}", trimmed));
+            }
         }
     }
     
@@ -1080,6 +1166,11 @@ mod tests {
             hid_keyboard: None,
             hid_mouse: None,
             render_driver: None,
+            flex_display: None,
+            camera_torch: None,
+            camera_zoom: None,
+            background_color: None,
+            keep_active: None,
         }
     }
 
@@ -1384,5 +1475,134 @@ pub async fn save_report(app_handle: tauri::AppHandle, content: String, name: St
     
     Ok(path.to_string_lossy().to_string())
 }
+
+#[tauri::command]
+pub async fn get_scrcpy_bin_dir() -> Result<String, String> {
+    let current_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        
+    let extract_path = current_dir.join("scrcpy-bin");
+    
+    if extract_path.exists() {
+        Ok(extract_path.to_string_lossy().to_string())
+    } else {
+        Ok(current_dir.to_string_lossy().to_string())
+    }
+}
+
+pub fn get_local_scrcpy_version(custom_path: Option<String>) -> Option<String> {
+    let exe_path = get_binary_path("scrcpy", custom_path);
+    let mut cmd = std::process::Command::new(&exe_path);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let output = cmd.arg("--version").output().ok()?;
+    if output.status.success() {
+        let out_str = String::from_utf8_lossy(&output.stdout);
+        for line in out_str.lines() {
+            if line.contains("scrcpy") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if let Some(idx) = parts.iter().position(|&x| x == "scrcpy") {
+                    if let Some(version) = parts.get(idx + 1) {
+                        return Some(version.trim_start_matches('v').to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+pub async fn get_latest_scrcpy_version() -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent("ScrcpyGui-Updater")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let api_url = "https://api.github.com/repos/Genymobile/scrcpy/releases/latest";
+    let api_resp = client.get(api_url).send().await;
+
+    let mut tag_name = String::new();
+    let mut used_fallback = false;
+
+    if let Ok(resp) = api_resp {
+        if resp.status().is_success() {
+            if let Ok(json) = resp.json::<serde_json::Value>().await {
+                if let Some(tag) = json["tag_name"].as_str() {
+                    tag_name = tag.trim_start_matches('v').to_string();
+                }
+            }
+        } else if resp.status() == reqwest::StatusCode::FORBIDDEN {
+            used_fallback = true;
+        }
+    } else {
+        used_fallback = true;
+    }
+
+    if used_fallback || tag_name.is_empty() {
+        let redirect_res = client.get("https://github.com/Genymobile/scrcpy/releases/latest")
+            .send().await
+            .map_err(|e| format!("Fallback failed: {}", e))?;
+        
+        let final_url = redirect_res.url().as_str();
+        if let Some(tag) = final_url.split('/').next_back() {
+            if tag.starts_with('v') || tag.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                tag_name = tag.trim_start_matches('v').to_string();
+            }
+        }
+    }
+
+    if tag_name.is_empty() {
+        return Err("Could not determine latest version".to_string());
+    }
+
+    Ok(tag_name)
+}
+
+fn compare_versions(local: &str, remote: &str) -> bool {
+    let local_parts: Vec<u32> = local.split('.')
+        .filter_map(|s| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok())
+        .collect();
+    let remote_parts: Vec<u32> = remote.split('.')
+        .filter_map(|s| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok())
+        .collect();
+
+    for i in 0..std::cmp::max(local_parts.len(), remote_parts.len()) {
+        let local_val = local_parts.get(i).cloned().unwrap_or(0);
+        let remote_val = remote_parts.get(i).cloned().unwrap_or(0);
+        if remote_val > local_val {
+            return true;
+        } else if local_val > remote_val {
+            return false;
+        }
+    }
+    false
+}
+
+#[tauri::command]
+pub async fn check_scrcpy_update(custom_path: Option<String>) -> serde_json::Value {
+    let local_version = match get_local_scrcpy_version(custom_path.clone()) {
+        Some(v) => v,
+        None => return json!({ "update_available": false, "local_version": null, "latest_version": null, "message": "Scrcpy not installed or not working" })
+    };
+
+    let latest_version = match get_latest_scrcpy_version().await {
+        Ok(v) => v,
+        Err(e) => return json!({ "update_available": false, "local_version": local_version, "latest_version": null, "message": format!("Could not fetch latest release: {}", e) })
+    };
+
+    let update_available = compare_versions(&local_version, &latest_version);
+
+    json!({
+        "update_available": update_available,
+        "local_version": local_version,
+        "latest_version": latest_version
+    })
+}
+
 
 

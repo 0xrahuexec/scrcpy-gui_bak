@@ -11,6 +11,9 @@ interface ThemedModalProps {
     kind?: ModalKind;
     actionLabel?: string;
     onAction?: () => void;
+    showCancel?: boolean;
+    cancelLabel?: string;
+    onCancel?: () => void;
 }
 
 export default function ThemedModal({
@@ -20,7 +23,10 @@ export default function ThemedModal({
     message,
     kind = 'info',
     actionLabel = 'OK',
-    onAction
+    onAction,
+    showCancel = false,
+    cancelLabel = 'Cancel',
+    onCancel
 }: ThemedModalProps) {
     if (!isOpen) return null;
 
@@ -98,13 +104,24 @@ export default function ThemedModal({
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-4 pt-0">
+                <div className="p-4 pt-0 flex gap-3">
+                    {showCancel && (
+                        <button
+                            onClick={() => {
+                                if (onCancel) onCancel();
+                                onClose();
+                            }}
+                            className="flex-1 py-4 bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:scale-[1.02] hover:text-white active:scale-95"
+                        >
+                            {cancelLabel}
+                        </button>
+                    )}
                     <button
                         onClick={() => {
                             if (onAction) onAction();
                             onClose();
                         }}
-                        className={`w-full py-4 bg-primary text-on-primary rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:scale-[1.02] active:scale-95 shadow-[0_10px_30px_-5px_rgba(139,92,246,0.3)]`}
+                        className={`${showCancel ? 'flex-1' : 'w-full'} py-4 bg-primary text-on-primary rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:scale-[1.02] active:scale-95 shadow-[0_10px_30px_-5px_rgba(139,92,246,0.3)]`}
                     >
                         {actionLabel}
                     </button>

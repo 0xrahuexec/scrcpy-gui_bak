@@ -157,7 +157,18 @@ export const zhCN: Translations = {
         startMission: '开始',
         engageCamera: '启用摄像头',
         ejectToDesktop: '投射到桌面',
-        stopSession: '停止'
+        stopSession: '停止',
+        // v4 features
+        flexDisplay: '弹性显示',
+        flexDisplayTooltip: '跟随 scrcpy 窗口动态调整虚拟显示器大小（scrcpy v4+）。',
+        cameraTorch: '手电筒',
+        cameraTorchTooltip: '摄像头流传时开启设备手电筒（scrcpy v4+）。',
+        cameraZoom: '摄像头缩放',
+        cameraZoomTooltip: '摄像头捕捉的缩放级别。1.0 = 不缩放。（scrcpy v4+）',
+        backgroundColor: '背景颜色',
+        backgroundColorTooltip: '窗口背景/外边区域的十六进制颜色（如 #1a1a1a）。留空则使用默认深灰色。（scrcpy v4+）',
+        backgroundColorNone: '默认',
+        badgeNew: '新'
     },
     sessionBehavior: {
         title: '行为设置',
@@ -185,7 +196,10 @@ export const zhCN: Translations = {
         recordPath: '录制路径',
         change: '更改',
         defaultVideosFolder: '默认（视频文件夹）',
-        selectRecordingFolderTitle: '选择录制文件夹'
+        selectRecordingFolderTitle: '选择录制文件夹',
+        // v4 features
+        keepActive: '保持活跃',
+        keepActiveTooltip: '模拟用户操作以防止屏幕进入空闲状态（scrcpy v4+）。'
     },
     shortcuts: {
         title: '快捷键 (Alt +)',
@@ -250,7 +264,11 @@ export const zhCN: Translations = {
     },
     alerts: {
         noDeviceSelectedTitle: '未选择设备',
-        noDeviceSelectedMessage: '请先从侧边栏选择一个设备再继续。提示：如果你刚接入手机，请点击侧边栏中的“刷新”以更新列表。'
+        noDeviceSelectedMessage: '请先从侧边栏选择一个设备再继续。提示：如果你刚接入手机，请点击侧边栏中的“刷新”以更新列表。',
+        updateAvailableTitle: '有可用更新',
+        updateAvailableMessage: 'Scrcpy 新版本 (v{latest}) 已发布。您当前安装的版本是 v{local}。是否现在更新？',
+        updateBtn: '立即更新',
+        cancelBtn: '以后再说'
     },
     logs: {
         noDeviceForDragDrop: '[警告] 未选择设备，无法执行拖放操作。',

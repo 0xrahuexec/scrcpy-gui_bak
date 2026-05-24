@@ -154,7 +154,18 @@ export const fr: Translations = {
         startMission: 'Démarrer la Mission',
         engageCamera: 'Activer la Caméra',
         ejectToDesktop: 'Éjecter vers le Bureau',
-        stopSession: 'Arrêter la Session'
+        stopSession: 'Arrêter la Session',
+        // v4 features
+        flexDisplay: 'Affichage Flexible',
+        flexDisplayTooltip: 'Redimensionne dynamiquement l\'affichage virtuel en fonction de la fenêtre scrcpy (scrcpy v4+).',
+        cameraTorch: 'Torche Caméra',
+        cameraTorchTooltip: 'Active la torche du téléphone pendant la diffusion de la caméra (scrcpy v4+).',
+        cameraZoom: 'Zoom Caméra',
+        cameraZoomTooltip: 'Niveau de zoom pour la capture caméra. 1.0 = pas de zoom. (scrcpy v4+)',
+        backgroundColor: 'Couleur Fond',
+        backgroundColorTooltip: 'Couleur hex pour le fond/letterbox de la fenêtre (ex. #1a1a1a). Laisser vide pour gris foncé par défaut. (scrcpy v4+)',
+        backgroundColorNone: 'Défaut',
+        badgeNew: 'NOUVEAU'
     },
     sessionBehavior: {
         title: 'Comportement de la Session',
@@ -182,7 +193,10 @@ export const fr: Translations = {
         recordPath: 'Chemin d\'Enregistrement',
         change: 'Modifier',
         defaultVideosFolder: 'Par défaut (Dossier Vidéos)',
-        selectRecordingFolderTitle: 'Sélectionner le Dossier d\'Enregistrement'
+        selectRecordingFolderTitle: 'Sélectionner le Dossier d\'Enregistrement',
+        // v4 features
+        keepActive: 'Garder Actif',
+        keepActiveTooltip: 'Simule une activité utilisateur pour empêcher l\'écran de se mettre en veille (scrcpy v4+).'
     },
     shortcuts: {
         title: 'Raccourcis (Alt +)',
@@ -247,7 +261,11 @@ export const fr: Translations = {
     },
     alerts: {
         noDeviceSelectedTitle: 'Aucun Appareil Sélectionné',
-        noDeviceSelectedMessage: "Veuillez sélectionner un appareil dans la barre latérale pour continuer. Astuce : si vous venez de connecter votre téléphone, cliquez sur « Actualiser » dans la barre latérale pour mettre à jour la liste."
+        noDeviceSelectedMessage: "Veuillez sélectionner un appareil dans la barre latérale pour continuer. Astuce : si vous venez de connecter votre téléphone, cliquez sur « Actualiser » dans la barre latérale pour mettre à jour la liste.",
+        updateAvailableTitle: 'Mise à jour disponible',
+        updateAvailableMessage: 'Une nouvelle version de Scrcpy (v{latest}) est disponible. Votre version installée est v{local}. Voulez-vous mettre à jour maintenant ?',
+        updateBtn: 'Mettre à jour',
+        cancelBtn: 'Plus tard'
     },
     logs: {
         noDeviceForDragDrop: '[WARN] Aucun appareil sélectionné pour l\'opération de glisser-déposer.',

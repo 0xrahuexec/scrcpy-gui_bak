@@ -155,9 +155,10 @@ export default function ControlPanel({
             )}
             <CustomSelect
                 label={t('controlPanel.fps')}
-                value={config.fps || 60}
-                onChange={(val) => handleChange('fps', parseInt(val))}
+                value={config.fps === undefined || config.fps === null ? 0 : config.fps}
+                onChange={(val) => handleChange('fps', parseInt(val) === 0 ? undefined : parseInt(val))}
                 options={[
+                    { value: 0, label: t('controlPanel.rendererAuto') || "Auto" },
                     { value: 30, label: "30" },
                     { value: 60, label: "60" },
                     { value: 90, label: "90" },
@@ -327,42 +328,30 @@ export default function ControlPanel({
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-center h-4">
+                                    <div className="flex items-center gap-1.5">
+                                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-tighter">{t('controlPanel.cameraDevice')}</label>
+                                        <Tooltip text={t('controlPanel.cameraDeviceTooltip')} placement="top" />
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <Tooltip text={t('controlPanel.refreshLensesTooltip')} placement="top" />
+                                        <button
+                                            onClick={() => onListOptions("--list-cameras")}
+                                            className="text-[8px] font-black uppercase text-primary hover:text-white transition-colors"
+                                        >
+                                            {t('controlPanel.refreshLenses')}
+                                        </button>
+                                    </div>
+                                </div>
                                 <CustomSelect
-                                    label={t('controlPanel.facing')}
-                                    value={config.cameraFacing || "back"}
-                                    onChange={(val) => handleChange('cameraFacing', val)}
+                                    value={config.cameraId || ""}
+                                    onChange={(val) => handleChange('cameraId', val)}
                                     options={[
-                                        { value: "back", label: t('controlPanel.facingBack') },
-                                        { value: "front", label: t('controlPanel.facingFront') },
-                                        { value: "external", label: t('controlPanel.facingExternal') },
+                                        { value: "", label: t('controlPanel.autoSelect') },
+                                        ...detectedCameras.map(cam => ({ value: cam.id, label: cam.name }))
                                     ]}
                                 />
-                                <div className="space-y-1">
-                                    <div className="flex justify-between items-center h-4">
-                                        <div className="flex items-center gap-1.5">
-                                            <label className="text-[9px] font-black text-zinc-500 uppercase tracking-tighter">{t('controlPanel.cameraDevice')}</label>
-                                            <Tooltip text={t('controlPanel.cameraDeviceTooltip')} placement="top" />
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <Tooltip text={t('controlPanel.refreshLensesTooltip')} placement="top" />
-                                            <button
-                                                onClick={() => onListOptions("--list-cameras")}
-                                                className="text-[8px] font-black uppercase text-primary hover:text-white transition-colors"
-                                            >
-                                                {t('controlPanel.refreshLenses')}
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <CustomSelect
-                                        value={config.cameraId || ""}
-                                        onChange={(val) => handleChange('cameraId', val)}
-                                        options={[
-                                            { value: "", label: t('controlPanel.autoSelect') },
-                                            ...detectedCameras.map(cam => ({ value: cam.id, label: cam.name }))
-                                        ]}
-                                    />
-                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">
@@ -388,6 +377,41 @@ export default function ControlPanel({
                                 />
                             </div>
 
+                            {/* v4: Camera Torch + Camera Zoom */}
+                            <div className="space-y-2 p-2.5 rounded-xl border border-zinc-800/60 bg-zinc-950/20">
+                                <div className="flex items-center gap-2 mb-0.5">
+                                    <span className="text-[8px] font-black uppercase text-zinc-500 tracking-widest">v4 Controls</span>
+                                    <span className="text-[7px] font-bold px-1 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 uppercase tracking-widest">{t('controlPanel.badgeNew')}</span>
+                                </div>
+                                <Tooltip text={t('controlPanel.cameraTorchTooltip')}>
+                                    <div className="flex items-center justify-between gap-2 cursor-pointer group" onClick={() => handleChange('cameraTorch', !config.cameraTorch)}>
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${config.cameraTorch ? 'bg-primary border-primary' : 'border-zinc-700 group-hover:border-primary'}`}>
+                                                {config.cameraTorch && <div className="w-1.5 h-1.5 bg-black rounded-[1px]" />}
+                                            </div>
+                                            <span className="text-[10px] font-bold uppercase text-zinc-300 tracking-wide group-hover:text-primary transition-colors">{t('controlPanel.cameraTorch')}</span>
+                                        </div>
+                                    </div>
+                                </Tooltip>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between items-center h-4">
+                                        <div className="flex items-center gap-1.5">
+                                            <label className="text-[9px] font-black text-zinc-500 uppercase tracking-tighter">{t('controlPanel.cameraZoom')}</label>
+                                            <Tooltip text={t('controlPanel.cameraZoomTooltip')} placement="top" />
+                                        </div>
+                                        <span className="text-[10px] font-black text-primary tabular-nums">{(config.cameraZoom || 1.0).toFixed(1)}x</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={10}
+                                        max={50}
+                                        value={Math.round((config.cameraZoom || 1.0) * 10)}
+                                        onChange={(e) => handleChange('cameraZoom', parseInt(e.target.value) / 10)}
+                                        className="w-full h-1 accent-primary bg-zinc-800 rounded-full appearance-none cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+
                             <div className={`space-y-2.5 pt-0.5`}>
                                 <PerformanceGrid />
                                 <BitrateControl label={t('controlPanel.bitrate')} value={config.bitrate || 8} onChange={(v) => handleChange('bitrate', v)} />
@@ -405,6 +429,18 @@ export default function ControlPanel({
                                         <h3 className="text-[10px] font-black uppercase text-zinc-300 tracking-widest">{t('controlPanel.virtualDisplayEngine')}</h3>
                                     </div>
                                     <div className="flex items-center gap-3">
+                                        {/* v4: Flex Display toggle */}
+                                        <Tooltip text={t('controlPanel.flexDisplayTooltip')}>
+                                            <button
+                                                onClick={() => handleChange('flexDisplay', !config.flexDisplay)}
+                                                className={`flex items-center gap-1.5 transition-colors ${config.flexDisplay ? 'text-primary' : 'text-zinc-600 hover:text-zinc-400'}`}
+                                                title={t('controlPanel.flexDisplay')}
+                                            >
+                                                <span className={`text-[8px] font-black uppercase tracking-tighter px-1 py-0.5 rounded border transition-colors ${config.flexDisplay ? 'bg-primary/10 border-primary/40 text-primary' : 'border-zinc-700 text-zinc-600'}`}>
+                                                    {t('controlPanel.flexDisplay')}
+                                                </span>
+                                            </button>
+                                        </Tooltip>
                                         <button
                                             onClick={() => handleChange('aspectRatioLock', !config.aspectRatioLock)}
                                             className={`flex items-center gap-1.5 transition-colors ${config.aspectRatioLock ? 'text-primary' : 'text-zinc-600 hover:text-zinc-400'}`}
@@ -492,6 +528,31 @@ export default function ControlPanel({
                             <div className="space-y-2.5 pt-0.5">
                                 <PerformanceGrid showResolution={false} />
                                 <BitrateControl label={t('controlPanel.bitrate')} value={config.bitrate || 8} onChange={(v) => handleChange('bitrate', v)} />
+                                {/* v4: Background Color for Desktop mode */}
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5">
+                                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-tighter">{t('controlPanel.backgroundColor')}</label>
+                                        <Tooltip text={t('controlPanel.backgroundColorTooltip')} placement="top" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div
+                                            className="w-5 h-5 rounded border border-zinc-700 shrink-0 transition-colors"
+                                            style={{ backgroundColor: config.backgroundColor || '#222222' }}
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="#1a1a1a"
+                                            value={config.backgroundColor || ''}
+                                            onChange={(e) => handleChange('backgroundColor', e.target.value)}
+                                            className="flex-1 bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1 text-[11px] text-zinc-300 focus:border-primary/60 focus:outline-none transition-colors font-mono"
+                                        />
+                                        {config.backgroundColor && (
+                                            <button onClick={() => handleChange('backgroundColor', '')} className="text-[8px] font-black text-zinc-600 hover:text-red-400 uppercase transition-colors">
+                                                {t('controlPanel.backgroundColorNone')}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}

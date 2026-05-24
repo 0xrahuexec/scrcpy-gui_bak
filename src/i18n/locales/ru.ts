@@ -163,6 +163,17 @@ export const ru: Translations = {
     engageCamera: 'Включить камеру',
     ejectToDesktop: 'Перейти на рабочий стол',
     stopSession: 'Остановить сессию',
+    // v4 features
+    flexDisplay: 'Гибкий дисплей',
+    flexDisplayTooltip: 'Динамически изменяет размер виртуального дисплея вместе с окном scrcpy (scrcpy v4+).',
+    cameraTorch: 'Фонарик камеры',
+    cameraTorchTooltip: 'Включает фонарик устройства во время трансляции камеры (scrcpy v4+).',
+    cameraZoom: 'Приближение камеры',
+    cameraZoomTooltip: 'Уровень приближения для захвата камеры. 1.0 = без приближения. (scrcpy v4+)',
+    backgroundColor: 'Цвет фона',
+    backgroundColorTooltip: 'HEX-цвет фона/полос окна (ex. #1a1a1a). Оставьте пустым для тёмно-серого по умолчанию. (scrcpy v4+)',
+    backgroundColorNone: 'По умолчанию',
+    badgeNew: 'НОВОЕ'
   },
 
   sessionBehavior: {
@@ -192,6 +203,9 @@ export const ru: Translations = {
     change: 'Изменить',
     defaultVideosFolder: 'По умолчанию (папка Видео)',
     selectRecordingFolderTitle: 'Выберите папку для записи',
+    // v4 features
+    keepActive: 'Держать активным',
+    keepActiveTooltip: 'Имитирует активность пользователя, чтобы экран не отключался (scrcpy v4+).',
   },
 
   shortcuts: {
@@ -263,6 +277,10 @@ export const ru: Translations = {
   alerts: {
     noDeviceSelectedTitle: 'Устройство не выбрано',
     noDeviceSelectedMessage: 'Выберите устройство на боковой панели, чтобы продолжить.\nПодсказка: если вы только что подключили телефон, нажмите «Обновить» на боковой панели, чтобы обновить список.',
+    updateAvailableTitle: 'Доступно обновление',
+    updateAvailableMessage: 'Доступна новая версия Scrcpy (v{latest}). Ваша установленная версия — v{local}. Хотите обновить сейчас?',
+    updateBtn: 'Обновить сейчас',
+    cancelBtn: 'Позже'
   },
 
   logs: {

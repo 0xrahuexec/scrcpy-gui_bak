@@ -155,7 +155,18 @@ export const en = {
         startMission: 'Start Mission',
         engageCamera: 'Engage Camera',
         ejectToDesktop: 'Eject to Desktop',
-        stopSession: 'Stop Session'
+        stopSession: 'Stop Session',
+        // v4 features
+        flexDisplay: 'Flex Display',
+        flexDisplayTooltip: 'Dynamically resize the virtual display to match the scrcpy window size (scrcpy v4+).',
+        cameraTorch: 'Camera Torch',
+        cameraTorchTooltip: 'Enable the device flashlight while streaming the camera feed (scrcpy v4+).',
+        cameraZoom: 'Camera Zoom',
+        cameraZoomTooltip: 'Zoom level for camera capture. 1.0 = no zoom. (scrcpy v4+)',
+        backgroundColor: 'BG Color',
+        backgroundColorTooltip: 'Hex color for the window background/letterbox area (e.g. #1a1a1a). Leave blank for default dark gray. (scrcpy v4+)',
+        backgroundColorNone: 'Default',
+        badgeNew: 'NEW'
     },
     sessionBehavior: {
         title: 'Session Behavior',
@@ -183,7 +194,10 @@ export const en = {
         recordPath: 'Record Path',
         change: 'Change',
         defaultVideosFolder: 'Default (Videos Folder)',
-        selectRecordingFolderTitle: 'Select Recording Folder'
+        selectRecordingFolderTitle: 'Select Recording Folder',
+        // v4 features
+        keepActive: 'Keep Active',
+        keepActiveTooltip: 'Simulates user activity to prevent the screen from going idle (scrcpy v4+).'
     },
     shortcuts: {
         title: 'Shortcuts (Alt +)',
@@ -248,7 +262,11 @@ export const en = {
     },
     alerts: {
         noDeviceSelectedTitle: 'No Device Selected',
-        noDeviceSelectedMessage: "Please select a device from the sidebar to continue. Hint: If you just connected your phone, click 'Refresh' in the sidebar to update the list."
+        noDeviceSelectedMessage: "Please select a device from the sidebar to continue. Hint: If you just connected your phone, click 'Refresh' in the sidebar to update the list.",
+        updateAvailableTitle: 'Update Available',
+        updateAvailableMessage: 'A new version of Scrcpy (v{latest}) is available. Your installed version is v{local}. Would you like to update now?',
+        updateBtn: 'Update Now',
+        cancelBtn: 'Later'
     },
     logs: {
         noDeviceForDragDrop: '[WARN] No device selected for drag-and-drop operation.',
