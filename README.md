@@ -12,7 +12,7 @@
 
 ---
 
-ScrcpyGUI v4 is a modern, feature-rich GUI for [scrcpy](https://github.com/Genymobile/scrcpy), completely rebuilt from the ground up using **Tauri v2**, **React 19**, and **Rust**. It transforms your Android device into a professional tool for gaming, development, and content creation.
+5crcpyGUI v4 is a modern, feature-rich GUI for [scrcpy](https://github.com/Genymobile/scrcpy), completely rebuilt from the ground up using **Tauri v2**, **React 19**, and **Rust**. It transforms your Android device into a professional tool for gaming, development, and content creation.
 
 ## 🚀 Key Features
 
@@ -67,7 +67,7 @@ To learn how to enable **USB Debugging**, set up **Wireless Pairing**, or instal
 
 ## 💖 Support the Project
 
-If ScrcpyGUI helps you in your daily workflow, consider supporting its development on Patreon. Your support keeps the project alive and independent!
+If 5crcpyGUI helps you in your daily workflow, consider supporting its development on Patreon. Your support keeps the project alive and independent!
 
 <p align="left">
   <a href="https://www.patreon.com/cw/KB_kilObit">
@@ -79,9 +79,9 @@ If ScrcpyGUI helps you in your daily workflow, consider supporting its developme
 
 ## � Acknowledgments
 
-ScrcpyGUI is made possible by the following amazing open-source projects:
+5crcpyGUI is made possible by the following amazing open-source projects:
 
-- **[scrcpy](https://github.com/Genymobile/scrcpy)**: The ultra-fast core engine.
+- **[5crcpy](https://github.com/Genymobile/scrcpy)**: The ultra-fast core engine.
 - **[Tauri](https://tauri.app/)**: The secure, lightweight framework for the desktop app.
 - **[Lucide Icons](https://lucide.dev/)**: For the clean and consistent iconography.
 - **[React](https://react.dev/)**: Powering the modern, interactive interface.
@@ -92,5 +92,5 @@ ScrcpyGUI is made possible by the following amazing open-source projects:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-*ScrcpyGUI is an independent project and is not affiliated with Genymobile or scrcpy authors.*
+*5crcpyGUI is an independent project and is not affiliated with Genymobile or scrcpy authors.*
 
